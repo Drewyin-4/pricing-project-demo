@@ -1,73 +1,116 @@
-# pricing-project-demo — Ultimate + Exposure + Trend Pricing Indication (R)
+# pricing-project-demo — Actuarial Pricing Indication (R)
 
-A compact actuarial pricing indication demo that replicates a common entry-level workflow:
+This repository demonstrates a compact actuarial pricing indication workflow built in R.
+The objective is to derive an accident-year level indicated pure premium starting from
+large, long-format loss development data and exposure information.
 
-1. Select AY-level ultimate losses from long-format triangle data  
-2. Join exposures by accident year (AY)  
-3. Convert to pure premium (ultimate / exposure)  
-4. Trend historical pure premiums to the latest AY  
-5. Produce an exposure-weighted indicated pure premium
+The project is structured to resemble an entry-level pricing support task:
+data reduction, transparent selection, and exposure-weighted indication.
 
 ---
 
-## Repo Structure
+## Project Structure
 
 - `scripts/`
-  - `00_all.R` — one-click runner (sources the full pipeline)
-  - `01_data_clean.R` — builds the AY-level pricing base (ultimate + dev_used + exposure)
-  - `02_pricing_ind.R` — computes pure premium, trending, and final indicated pure premium
+  - `00_all.R` — one-click runner for the full pipeline
+  - `01_data_clean.R` — builds the accident-year pricing base
+  - `02_pricing_ind.R` — computes pure premiums, applies trend, and produces indication
 
 - `outputs/`
-  - `pricing_base.rds` — cleaned AY-level dataset used downstream
-  - `pricing_base.csv` — pricing base + derived fields (pure premium, trended values)
-  - `indicated_pp.txt` — final indicated pure premium (single scalar)
+  - `pricing_base.rds` — cleaned accident-year pricing base
+  - `pricing_base.csv` — pricing base with derived fields
+  - `indicated_pp.txt` — final indicated pure premium (scalar)
 
-> `outputs/` is committed to make the demo immediately reviewable without running code.
-
----
-
-## Data Inputs
-
-This pipeline expects two raw inputs (not included here if licensing is unclear):
-
-- `meyers_triangles_long.csv`  
-  Long format: accident year × development lag with ultimate loss values.
-- `meyers_exposure.csv`  
-  Exposure by accident year.
-
-### Required fields (minimum)
-- Triangle file: `ay`, `dev_lag`, `ultimate`, plus filtering fields used in the scripts
-- Exposure file: `ay`, `exposure`
-
-If raw data is not published, the repo still includes `outputs/pricing_base.rds` and `outputs/pricing_base.csv` for inspection.
+Outputs are committed to make the project immediately reviewable without executing code.
 
 ---
 
-## How It Works (Logic)
+## Data Scale and Processing Notes
 
-### Step 1 — Loss Selection (Ultimate)
-- Filter to a specific line/segment (e.g., `ppauto`, `ultimate`, `train`)
-- For each AY, select the row with the maximum development lag as the selected ultimate
-- Keep the selected development lag as `dev_used` for transparency
+### Raw data characteristics
 
-### Step 2 — Join Exposure
-- Aggregate exposure by AY (if needed)
-- Join exposure onto the selected ultimate table
+This project starts from long-format loss development and exposure data:
 
-### Step 3 — Pure Premium + Trending
-- `pure_premium = ultimate / exposure`
-- Apply a constant annual trend factor to bring each AY to the latest AY:
-  - `pure_premium_trended = pure_premium * (1 + trend)^(latest_ay - ay)`
-- Default trend in the script: `trend = 0.05` (5% annual)
+- **Loss triangles (`meyers_triangles_long.csv`)**
+  - ~**444,000 rows**, **8 columns**
+  - **10 accident years**
+  - Development lags from **1 to 10**
+  - Long format (one row per accident year × development lag), consistent with
+    industry triangle storage and downstream aggregation workflows.
 
-### Step 4 — Indication
-- Exposure-weighted mean of trended pure premiums:
-  - `indicated_pp = sum(pure_premium_trended * exposure) / sum(exposure)`
+- **Exposure data (`meyers_exposure.csv`)**
+  - ~**7,800 rows**, **5 columns**
+  - Exposure recorded at the accident-year level.
+
+Raw input files are not committed if licensing is unclear.  
+Instead, the processed pricing base and final outputs are included for inspection.
 
 ---
 
-## Run Instructions
+### Data reduction and selection logic
 
-### Option A (recommended): run full pipeline
+The pipeline intentionally reduces a large development-level dataset to an
+**accident-year pricing view**, following standard pricing practice:
+
+1. Filter the loss data to the relevant line, segment, and measure
+   (e.g. ultimate losses for a training sample).
+2. For each accident year, select the record with the **maximum development lag**
+   as the working ultimate.
+3. Retain the selected development lag (`dev_used`) for transparency.
+4. Aggregate and join exposure by accident year.
+
+After selection:
+- The pricing base contains **10 rows**, one per accident year.
+- Each row represents the selected ultimate loss and exposure used for pricing.
+
+This reduction is deliberate: pricing decisions are made at the **accident-year level**,
+not at individual development lags.
+
+---
+
+## Pricing and Indication
+
+From the accident-year pricing base:
+
+- **Pure premium** is calculated as  
+  `pure premium = ultimate / exposure`
+- A constant annual trend factor is applied to bring each accident year to the
+  latest accident year.
+- The final indication is computed as an **exposure-weighted mean** of trended
+  pure premiums.
+
+---
+
+## Outputs
+
+- `outputs/pricing_base.rds`  
+  Accident-year pricing base (selected ultimate, exposure, development lag used).
+
+- `outputs/pricing_base.csv`  
+  Pricing base with derived fields:
+  - pure premium
+  - years trended to latest accident year
+  - trended pure premium
+
+- `outputs/indicated_pp.txt`  
+  Final exposure-weighted indicated pure premium (single scalar value).
+
+These outputs are intentionally small and interpretable, while remaining traceable
+to a much larger underlying loss history.
+
+---
+
+## Practical Notes
+
+- A constant trend is used for demonstration purposes; production pricing would
+  typically apply calendar-year or split frequency/severity trends.
+- Selecting the maximum development lag per accident year is a simplified proxy
+  for maturity selection and keeps the example focused on pricing mechanics rather
+  than reserving methodology.
+
+---
+
+## How to Run
+
 ```r
 source("scripts/00_all.R")
